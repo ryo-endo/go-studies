@@ -8,7 +8,30 @@ import (
 
 func readAll(r io.Reader, capacity int64) (b []byte, err error) {
 	var buf bytes.Buffer
-	return buf.Bytes(), nil
+
+	defer func() {
+		// deferの中でrecover関数呼び出すと、panic関数に渡されたオブジェクトを取得できる
+		e := recover()
+		if e == nil {
+			return
+		}
+
+		// e.(error)はinterfaceを型にキャストしている。変換できたかどうかは戻り値で判断。
+		if panicErr, ok := e.(error); ok && panicErr == bytes.ErrTooLarge {
+			err = panicErr
+		} else {
+			panic(e)
+		}
+	}()
+
+	// Grow関数の引数はint型なので、capacityがint型に収まるかチェックしている。
+	if (int64(int(capacity))) == capacity {
+		buf.Grow(int(capacity))
+	}
+
+	_, err = buf.ReadFrom(r)
+
+	return buf.Bytes(), err
 }
 
 func ReadFile(filename string) ([]byte, error) {
